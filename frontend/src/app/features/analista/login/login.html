@@ -1,0 +1,33 @@
+<section class="tarjeta acceso">
+  <p class="etiqueta">Acceso restringido</p>
+  <h1>Ingreso de analistas</h1>
+  <p class="texto-secundario">
+    Inicia sesión para revisar y evaluar a los practicantes registrados.
+  </p>
+
+  @if (motivo() === 'sesion-expirada') {
+    <div class="alerta alerta--aviso" role="status">Tu sesión expiró. Vuelve a iniciar sesión.</div>
+  }
+  @if (error(); as mensaje) {
+    <div class="alerta alerta--error" role="alert">{{ mensaje }}</div>
+  }
+
+  <form [formGroup]="formulario" (ngSubmit)="enviar()" novalidate>
+    <div class="campo">
+      <label for="usuario">Usuario</label>
+      <input id="usuario" type="text" formControlName="usuario" autocomplete="username" />
+    </div>
+    <div class="campo">
+      <label for="contrasena">Contraseña</label>
+      <input
+        id="contrasena"
+        type="password"
+        formControlName="contrasena"
+        autocomplete="current-password"
+      />
+    </div>
+    <button type="submit" class="boton boton--primario boton--bloque" [disabled]="enviando()">
+      {{ enviando() ? 'Ingresando…' : 'Ingresar' }}
+    </button>
+  </form>
+</section>

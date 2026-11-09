@@ -1,0 +1,27 @@
+<header class="barra">
+  <div class="contenedor barra__contenido">
+    <a routerLink="/registro" class="marca" aria-label="Plataforma de Prácticas, inicio">
+      <span class="marca__logo" aria-hidden="true">P</span>
+      <span class="marca__texto">Plataforma de <strong>Prácticas</strong></span>
+    </a>
+
+    <nav class="navegacion" aria-label="Principal">
+      <a routerLink="/registro" routerLinkActive="activo">Registro</a>
+      <a routerLink="/analista" routerLinkActive="activo">Panel de analista</a>
+      @if (auth.nombre(); as nombre) {
+        <span class="navegacion__usuario" title="Sesión iniciada">{{ nombre }}</span>
+        <button type="button" class="boton boton--fantasma boton--pequeno" (click)="cerrarSesion()">
+          Cerrar sesión
+        </button>
+      }
+    </nav>
+  </div>
+</header>
+
+<main class="contenedor principal">
+  <router-outlet />
+</main>
+
+<footer class="pie">
+  <div class="contenedor">Plataforma básica de selección de practicantes · {{ anio }}</div>
+</footer>

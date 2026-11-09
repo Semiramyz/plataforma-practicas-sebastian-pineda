@@ -1,0 +1,151 @@
+.registro {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 3rem;
+  align-items: start;
+}
+
+.registro__intro h1 {
+  font-size: clamp(1.9rem, 3vw, 2.5rem);
+  margin: 0.4rem 0 0.75rem;
+}
+
+.pasos {
+  list-style: none;
+  padding: 0;
+  margin: 2rem 0 0;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.pasos li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--texto-secundario);
+}
+
+.pasos span {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--primario-suave);
+  color: var(--primario);
+  font-weight: 700;
+}
+
+.titulo-formulario {
+  font-size: 1.15rem;
+  margin: 0 0 1.25rem;
+}
+
+.fila {
+  display: grid;
+  grid-template-columns: 1fr 11rem;
+  gap: 1rem;
+}
+
+.zona-archivo {
+  display: grid;
+  gap: 0.25rem;
+  justify-items: center;
+  padding: 1.5rem 1rem;
+  border: 2px dashed var(--borde-fuerte);
+  border-radius: var(--radio);
+  background: var(--fondo-suave);
+  color: var(--texto-secundario);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.zona-archivo strong {
+  color: var(--primario);
+}
+
+.zona-archivo:hover,
+.zona-archivo--activa {
+  border-color: var(--primario);
+  background: var(--primario-suave);
+}
+
+.archivo-elegido {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.archivo-elegido__icono {
+  padding: 0.5rem;
+  border-radius: 6px;
+  background: var(--peligro-suave);
+  color: var(--peligro);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.archivo-elegido__datos {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.archivo-elegido__datos strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archivo-elegido__datos small {
+  color: var(--texto-secundario);
+}
+
+.exito {
+  text-align: center;
+  padding: 2rem 0.5rem;
+}
+
+.exito__icono {
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  background: var(--exito-suave);
+  color: var(--exito);
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+
+.nota {
+  margin: 1rem 0 0;
+  font-size: 0.875rem;
+  color: var(--texto-secundario);
+  text-align: center;
+}
+
+@media (max-width: 860px) {
+  .registro {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .pasos {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .fila {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}

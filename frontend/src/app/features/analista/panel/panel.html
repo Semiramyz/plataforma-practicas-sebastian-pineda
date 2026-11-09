@@ -1,0 +1,186 @@
+<section class="encabezado">
+  <div>
+    <p class="etiqueta">Selección de practicantes</p>
+    <h1>Panel de analista</h1>
+  </div>
+  <button type="button" class="boton boton--secundario" (click)="cargar()" [disabled]="cargando()">
+    {{ cargando() ? 'Actualizando…' : 'Actualizar' }}
+  </button>
+</section>
+
+<div class="indicadores" role="tablist" aria-label="Filtrar por estado">
+  @for (indicador of indicadores(); track indicador.filtro) {
+    <button
+      type="button"
+      role="tab"
+      class="indicador indicador--{{ indicador.filtro.toLowerCase() }}"
+      [class.indicador--activo]="filtro() === indicador.filtro"
+      [attr.aria-selected]="filtro() === indicador.filtro"
+      (click)="filtro.set(indicador.filtro)"
+    >
+      <span class="indicador__cantidad">{{ indicador.cantidad }}</span>
+      <span class="indicador__etiqueta">{{ indicador.etiqueta }}</span>
+    </button>
+  }
+</div>
+
+<div class="espacio-trabajo" [class.espacio-trabajo--con-detalle]="seleccionado()">
+  <section class="tarjeta listado" aria-label="Practicantes registrados">
+    <div class="listado__barra">
+      <input
+        type="search"
+        placeholder="Buscar por nombre, correo o carrera"
+        aria-label="Buscar practicante"
+        [value]="busqueda()"
+        (input)="buscar($event)"
+      />
+    </div>
+
+    @if (cargando() && practicantes().length === 0) {
+      <p class="vacio">Cargando practicantes…</p>
+    } @else if (errorCarga(); as error) {
+      <div class="vacio">
+        <p>{{ error }}</p>
+        <button type="button" class="boton boton--secundario" (click)="cargar()">Reintentar</button>
+      </div>
+    } @else if (visibles().length === 0) {
+      <p class="vacio">
+        {{
+          practicantes().length === 0
+            ? 'Aún no hay practicantes registrados.'
+            : 'No hay practicantes que coincidan con el filtro.'
+        }}
+      </p>
+    } @else {
+      <div class="tabla-contenedor">
+        <table class="tabla">
+          <thead>
+            <tr>
+              <th scope="col">Practicante</th>
+              <th scope="col">Carrera</th>
+              <th scope="col" class="centrado">Semestre</th>
+              <th scope="col">Registro</th>
+              <th scope="col">Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of visibles(); track p.id) {
+              <tr
+                tabindex="0"
+                [class.seleccionada]="p.id === seleccionadoId()"
+                [attr.aria-selected]="p.id === seleccionadoId()"
+                (click)="seleccionar(p)"
+                (keydown.enter)="seleccionar(p)"
+              >
+                <td>
+                  <strong>{{ p.nombreCompleto }}</strong>
+                  <small>{{ p.correo }}</small>
+                </td>
+                <td>{{ p.carrera }}</td>
+                <td class="centrado">{{ p.semestre }}</td>
+                <td>{{ p.fechaRegistroUtc | date: 'd MMM y' }}</td>
+                <td>
+                  <span [class]="claseEstado(p.estado)">{{ etiquetas[p.estado] }}</span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+
+  @if (seleccionado(); as p) {
+    <aside class="tarjeta detalle" aria-label="Detalle del practicante">
+      <div class="detalle__cabecera">
+        <div>
+          <span [class]="claseEstado(p.estado)">{{ etiquetas[p.estado] }}</span>
+          <h2>{{ p.nombreCompleto }}</h2>
+        </div>
+        <button type="button" class="cerrar" aria-label="Cerrar detalle" (click)="cerrarDetalle()">
+          ×
+        </button>
+      </div>
+
+      <dl class="datos">
+        <dt>Correo</dt>
+        <dd>
+          <a [href]="'mailto:' + p.correo">{{ p.correo }}</a>
+        </dd>
+        <dt>Carrera</dt>
+        <dd>{{ p.carrera }}</dd>
+        <dt>Semestre</dt>
+        <dd>{{ p.semestre }}.º semestre</dd>
+        <dt>Registrado</dt>
+        <dd>{{ p.fechaRegistroUtc | date: 'd MMM y, h:mm a' }}</dd>
+        <dt>Evaluado</dt>
+        <dd>
+          {{
+            p.fechaEvaluacionUtc ? (p.fechaEvaluacionUtc | date: 'd MMM y, h:mm a') : 'Sin evaluar'
+          }}
+        </dd>
+      </dl>
+
+      <div class="hoja-de-vida">
+        <span class="hoja-de-vida__icono" aria-hidden="true">PDF</span>
+        <div class="hoja-de-vida__datos">
+          <strong>{{ p.hojaDeVidaNombre }}</strong>
+          <small>{{ tamano(p.hojaDeVidaTamanoBytes) }}</small>
+        </div>
+      </div>
+      <div class="acciones">
+        <button
+          type="button"
+          class="boton boton--secundario"
+          [disabled]="descargando()"
+          (click)="hojaDeVida(p, 'ver')"
+        >
+          Ver PDF
+        </button>
+        <button
+          type="button"
+          class="boton boton--secundario"
+          [disabled]="descargando()"
+          (click)="hojaDeVida(p, 'descargar')"
+        >
+          Descargar
+        </button>
+      </div>
+
+      <h3>Decisión</h3>
+      <div class="acciones">
+        <button
+          type="button"
+          class="boton boton--exito"
+          [class.boton--marcado]="p.estado === 'Viable'"
+          [attr.aria-pressed]="p.estado === 'Viable'"
+          [disabled]="guardando() !== null"
+          (click)="evaluar(p, 'Viable')"
+        >
+          {{ guardando() === 'Viable' ? 'Guardando…' : 'Viable' }}
+        </button>
+        <button
+          type="button"
+          class="boton boton--peligro"
+          [class.boton--marcado]="p.estado === 'NoViable'"
+          [attr.aria-pressed]="p.estado === 'NoViable'"
+          [disabled]="guardando() !== null"
+          (click)="evaluar(p, 'NoViable')"
+        >
+          {{ guardando() === 'NoViable' ? 'Guardando…' : 'No viable' }}
+        </button>
+      </div>
+
+      @if (mensaje(); as m) {
+        <div
+          class="alerta"
+          [class.alerta--exito]="m.tipo === 'exito'"
+          [class.alerta--error]="m.tipo === 'error'"
+          role="status"
+        >
+          {{ m.texto }}
+        </div>
+      }
+    </aside>
+  }
+</div>

@@ -1,0 +1,167 @@
+<section class="registro">
+  <div class="registro__intro">
+    <p class="etiqueta">Convocatoria de prácticas profesionales</p>
+    <h1>Registra tu información</h1>
+    <p class="texto-secundario">
+      Completa el formulario y adjunta tu hoja de vida. Un analista de selección revisará tu perfil
+      y definirá si continúas en el proceso.
+    </p>
+    <ol class="pasos">
+      <li><span>1</span> Completa tus datos básicos.</li>
+      <li><span>2</span> Adjunta tu hoja de vida en PDF.</li>
+      <li><span>3</span> Un analista revisa tu postulación.</li>
+    </ol>
+  </div>
+
+  <div class="tarjeta registro__formulario">
+    @if (registro(); as registro) {
+      <div class="exito" role="status">
+        <div class="exito__icono" aria-hidden="true">✓</div>
+        <h2>¡Registro enviado!</h2>
+        <p>
+          Gracias, <strong>{{ registro.nombreCompleto }}</strong
+          >. Tu postulación quedó registrada con el número <strong>#{{ registro.id }}</strong> y
+          está pendiente de revisión.
+        </p>
+        <button type="button" class="boton boton--secundario" (click)="registrarOtro()">
+          Registrar a otro practicante
+        </button>
+      </div>
+    } @else {
+      <form [formGroup]="formulario" (ngSubmit)="enviar()" novalidate>
+        <h2 class="titulo-formulario">Datos del practicante</h2>
+
+        @if (errorGeneral(); as mensaje) {
+          <div class="alerta alerta--error" role="alert">{{ mensaje }}</div>
+        }
+
+        <div class="campo">
+          <label for="nombreCompleto">Nombre completo <span class="obligatorio">*</span></label>
+          <input
+            id="nombreCompleto"
+            type="text"
+            formControlName="nombreCompleto"
+            autocomplete="name"
+            placeholder="Ej. Ana María Gómez Rojas"
+            [class.invalido]="error('nombreCompleto')"
+            [attr.aria-invalid]="!!error('nombreCompleto')"
+            aria-describedby="error-nombreCompleto"
+            (input)="limpiarErrorServidor('nombreCompleto')"
+          />
+          <p class="campo__error" id="error-nombreCompleto">{{ error('nombreCompleto') }}</p>
+        </div>
+
+        <div class="campo">
+          <label for="correo">Correo electrónico <span class="obligatorio">*</span></label>
+          <input
+            id="correo"
+            type="email"
+            formControlName="correo"
+            autocomplete="email"
+            placeholder="nombre@correo.com"
+            [class.invalido]="error('correo')"
+            [attr.aria-invalid]="!!error('correo')"
+            aria-describedby="error-correo"
+            (input)="limpiarErrorServidor('correo')"
+          />
+          <p class="campo__error" id="error-correo">{{ error('correo') }}</p>
+        </div>
+
+        <div class="fila">
+          <div class="campo">
+            <label for="carrera">Carrera universitaria <span class="obligatorio">*</span></label>
+            <input
+              id="carrera"
+              type="text"
+              formControlName="carrera"
+              list="carreras"
+              placeholder="Ej. Ingeniería de Sistemas"
+              [class.invalido]="error('carrera')"
+              [attr.aria-invalid]="!!error('carrera')"
+              aria-describedby="error-carrera"
+              (input)="limpiarErrorServidor('carrera')"
+            />
+            <datalist id="carreras">
+              @for (carrera of carrerasSugeridas; track carrera) {
+                <option [value]="carrera"></option>
+              }
+            </datalist>
+            <p class="campo__error" id="error-carrera">{{ error('carrera') }}</p>
+          </div>
+
+          <div class="campo campo--corto">
+            <label for="semestre">Semestre actual <span class="obligatorio">*</span></label>
+            <select
+              id="semestre"
+              formControlName="semestre"
+              [class.invalido]="error('semestre')"
+              [attr.aria-invalid]="!!error('semestre')"
+              aria-describedby="error-semestre"
+              (change)="limpiarErrorServidor('semestre')"
+            >
+              <option [ngValue]="null" disabled>Selecciona</option>
+              @for (semestre of semestres; track semestre) {
+                <option [ngValue]="semestre">{{ semestre }}.º semestre</option>
+              }
+            </select>
+            <p class="campo__error" id="error-semestre">{{ error('semestre') }}</p>
+          </div>
+        </div>
+
+        <div class="campo">
+          <span class="campo__etiqueta" id="etiqueta-hoja">
+            Hoja de vida (PDF) <span class="obligatorio">*</span>
+          </span>
+          @if (archivo(); as archivo) {
+            <div class="archivo-elegido" [class.invalido]="error('hojaDeVida')">
+              <span class="archivo-elegido__icono" aria-hidden="true">PDF</span>
+              <span class="archivo-elegido__datos">
+                <strong>{{ archivo.name }}</strong>
+                <small>{{ tamano(archivo.size) }}</small>
+              </span>
+              <button
+                type="button"
+                class="boton boton--fantasma boton--pequeno"
+                (click)="quitarArchivo()"
+              >
+                Quitar
+              </button>
+            </div>
+          } @else {
+            <label
+              class="zona-archivo"
+              for="hojaDeVida"
+              [class.zona-archivo--activa]="arrastrando()"
+              [class.invalido]="error('hojaDeVida')"
+              (dragover)="alArrastrar($event, true)"
+              (dragleave)="alArrastrar($event, false)"
+              (drop)="alSoltar($event)"
+            >
+              <strong>Haz clic para elegir tu hoja de vida</strong>
+              <span>o arrástrala aquí · Solo PDF, máximo {{ tamanoMaximo }}</span>
+            </label>
+          }
+          <input
+            #selectorArchivo
+            id="hojaDeVida"
+            class="oculto-visualmente"
+            type="file"
+            accept="application/pdf,.pdf"
+            aria-labelledby="etiqueta-hoja"
+            aria-describedby="error-hojaDeVida"
+            (change)="alSeleccionarArchivo($event)"
+          />
+          <p class="campo__error" id="error-hojaDeVida">{{ error('hojaDeVida') }}</p>
+        </div>
+
+        <button type="submit" class="boton boton--primario boton--bloque" [disabled]="enviando()">
+          {{ enviando() ? 'Enviando…' : 'Enviar registro' }}
+        </button>
+        <p class="nota">
+          Los campos con <span class="obligatorio">*</span> son obligatorios. ¿Eres analista?
+          <a routerLink="/analista">Ingresa al panel</a>.
+        </p>
+      </form>
+    }
+  </div>
+</section>
