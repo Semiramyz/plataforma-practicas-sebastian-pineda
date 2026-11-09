@@ -1,0 +1,16 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+
+# Datos locales generados por la API (base de datos SQLite y hojas de vida subidas)
+backend/src/Practicas.Api/App_Data/
+
+# Editores
+.idea/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
