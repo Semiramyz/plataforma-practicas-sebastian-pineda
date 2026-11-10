@@ -1,0 +1,9 @@
+.git
+docs
+**/bin
+**/obj
+**/App_Data
+**/TestResults
+frontend/node_modules
+frontend/dist
+frontend/.angular

@@ -1,0 +1,10 @@
+services:
+  plataforma:
+    build: .
+    ports:
+      - "5080:8080"
+    volumes:
+      - datos:/datos   # base de datos SQLite y hojas de vida; se conservan entre reinicios
+
+volumes:
+  datos:
