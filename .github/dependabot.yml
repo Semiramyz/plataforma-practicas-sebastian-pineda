@@ -1,0 +1,23 @@
+# Actualizaciones automáticas de dependencias (OWASP A06: componentes vulnerables o desactualizados).
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /backend
+    schedule:
+      interval: weekly
+    groups:
+      microsoft:
+        patterns: ["Microsoft.*", "System.*"]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    groups:
+      angular:
+        patterns: ["@angular/*", "@angular-devkit/*", "angular-eslint"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

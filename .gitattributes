@@ -1,2 +1,7 @@
 * text=auto
 *.png binary
+
+# Los scripts de arranque deben conservar el final de línea de su sistema.
+*.sh  text eol=lf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
