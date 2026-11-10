@@ -23,9 +23,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       if (
         error instanceof HttpErrorResponse &&
         error.status === 401 &&
-        !req.url.endsWith('/auth/login')
+        !req.url.startsWith('/api/auth/')
       ) {
-        auth.cerrarSesion();
+        // El token ya no sirve: se borra localmente sin volver a llamar a la API.
+        auth.limpiar();
         void router.navigate(['/analista/login'], {
           queryParams: { volver: router.url, motivo: 'sesion-expirada' },
         });

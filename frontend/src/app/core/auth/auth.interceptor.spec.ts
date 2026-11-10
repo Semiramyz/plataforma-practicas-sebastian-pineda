@@ -61,4 +61,17 @@ describe('authInterceptor', () => {
     expect(auth.estaAutenticado()).toBe(false);
     expect(navegar).toHaveBeenCalledWith(['/analista/login'], expect.anything());
   });
+
+  it('al cerrar sesión avisa a la API para revocar el token y borra la sesión', () => {
+    iniciarSesion();
+
+    auth.cerrarSesion();
+
+    const logout = backend.expectOne('/api/auth/logout');
+    expect(logout.request.method).toBe('POST');
+    expect(logout.request.headers.get('Authorization')).toBe('Bearer token-de-prueba');
+    logout.flush(null, { status: 204, statusText: 'No Content' });
+    expect(auth.estaAutenticado()).toBe(false);
+    expect(sessionStorage.getItem('practicas.sesion')).toBeNull();
+  });
 });

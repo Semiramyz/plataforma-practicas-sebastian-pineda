@@ -1,15 +1,16 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import {
-  DecisionAnalista,
   ETIQUETAS_ESTADO,
   EstadoPracticante,
   Practicante,
 } from '../../../core/models/practicante.model';
 import { PracticantesService } from '../../../core/services/practicantes.service';
-import { formatearTamano, interpretarError } from '../../../core/utils/errores-http';
+import { interpretarError } from '../../../core/utils/errores-http';
 
 type Filtro = EstadoPracticante | 'Todos';
+type Orden = 'recientes' | 'antiguos' | 'puntaje';
 
 interface Indicador {
   filtro: Filtro;
@@ -19,7 +20,7 @@ interface Indicador {
 
 @Component({
   selector: 'app-panel',
-  imports: [DatePipe],
+  imports: [DatePipe, RouterLink],
   templateUrl: './panel.html',
   styleUrl: './panel.css',
 })
@@ -33,35 +34,49 @@ export class Panel implements OnInit {
   protected readonly errorCarga = signal<string | null>(null);
   protected readonly filtro = signal<Filtro>('Todos');
   protected readonly busqueda = signal('');
-  protected readonly seleccionadoId = signal<number | null>(null);
-  protected readonly guardando = signal<DecisionAnalista | null>(null);
-  protected readonly descargando = signal(false);
-  protected readonly mensaje = signal<{ tipo: 'exito' | 'error'; texto: string } | null>(null);
+  protected readonly orden = signal<Orden>('recientes');
 
   protected readonly indicadores = computed<Indicador[]>(() => {
     const lista = this.practicantes();
     const contar = (estado: EstadoPracticante) => lista.filter((p) => p.estado === estado).length;
     return [
       { filtro: 'Todos', etiqueta: 'Registrados', cantidad: lista.length },
-      { filtro: 'Pendiente', etiqueta: 'Pendientes', cantidad: contar('Pendiente') },
+      { filtro: 'Pendiente', etiqueta: 'Por evaluar', cantidad: contar('Pendiente') },
       { filtro: 'Viable', etiqueta: 'Viables', cantidad: contar('Viable') },
       { filtro: 'NoViable', etiqueta: 'No viables', cantidad: contar('NoViable') },
     ];
   });
 
+  /** Puntaje promedio de las hojas de vida ya evaluadas con la rúbrica. */
+  protected readonly puntajePromedio = computed(() => {
+    const puntajes = this.practicantes()
+      .map((p) => p.evaluacion?.puntajeTotal)
+      .filter((p): p is number => p !== undefined);
+    return puntajes.length
+      ? Math.round(puntajes.reduce((a, b) => a + b, 0) / puntajes.length)
+      : null;
+  });
+
   protected readonly visibles = computed(() => {
     const filtro = this.filtro();
     const texto = normalizar(this.busqueda());
-    return this.practicantes().filter(
+    const lista = this.practicantes().filter(
       (p) =>
         (filtro === 'Todos' || p.estado === filtro) &&
         (!texto || normalizar(`${p.nombreCompleto} ${p.correo} ${p.carrera}`).includes(texto)),
     );
-  });
 
-  protected readonly seleccionado = computed(
-    () => this.practicantes().find((p) => p.id === this.seleccionadoId()) ?? null,
-  );
+    switch (this.orden()) {
+      case 'antiguos':
+        return [...lista].reverse();
+      case 'puntaje':
+        return [...lista].sort(
+          (a, b) => (b.evaluacion?.puntajeTotal ?? -1) - (a.evaluacion?.puntajeTotal ?? -1),
+        );
+      default:
+        return lista;
+    }
+  });
 
   ngOnInit(): void {
     this.cargar();
@@ -82,81 +97,24 @@ export class Panel implements OnInit {
     });
   }
 
-  protected seleccionar(practicante: Practicante): void {
-    this.seleccionadoId.set(practicante.id);
-    this.mensaje.set(null);
-  }
-
-  protected cerrarDetalle(): void {
-    this.seleccionadoId.set(null);
-  }
-
   protected buscar(evento: Event): void {
     this.busqueda.set((evento.target as HTMLInputElement).value);
   }
 
-  protected evaluar(practicante: Practicante, decision: DecisionAnalista): void {
-    if (this.guardando() || practicante.estado === decision) {
-      return;
-    }
-
-    this.guardando.set(decision);
-    this.mensaje.set(null);
-    this.servicio.actualizarEstado(practicante.id, decision).subscribe({
-      next: (actualizado) => {
-        this.practicantes.update((lista) =>
-          lista.map((p) => (p.id === actualizado.id ? actualizado : p)),
-        );
-        this.guardando.set(null);
-        this.mensaje.set({
-          tipo: 'exito',
-          texto: `${actualizado.nombreCompleto} quedó marcado como "${this.etiquetas[actualizado.estado]}".`,
-        });
-      },
-      error: (error: unknown) => {
-        this.guardando.set(null);
-        this.mensaje.set({ tipo: 'error', texto: interpretarError(error).mensaje });
-      },
-    });
-  }
-
-  /** Abre la hoja de vida en una pestaña nueva o la descarga con su nombre original. */
-  protected hojaDeVida(practicante: Practicante, modo: 'ver' | 'descargar'): void {
-    // La pestaña se abre de inmediato para que el navegador no la bloquee como ventana emergente.
-    const pestana = modo === 'ver' ? window.open('', '_blank') : null;
-    this.descargando.set(true);
-
-    this.servicio.descargarHojaDeVida(practicante.id).subscribe({
-      next: (pdf) => {
-        this.descargando.set(false);
-        const url = URL.createObjectURL(pdf);
-        if (pestana) {
-          pestana.location.href = url;
-        } else {
-          const enlace = document.createElement('a');
-          enlace.href = url;
-          enlace.download = practicante.hojaDeVidaNombre;
-          enlace.click();
-        }
-        setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      },
-      error: (error: unknown) => {
-        pestana?.close();
-        this.descargando.set(false);
-        this.mensaje.set({ tipo: 'error', texto: interpretarError(error).mensaje });
-      },
-    });
+  protected ordenar(evento: Event): void {
+    this.orden.set((evento.target as HTMLSelectElement).value as Orden);
   }
 
   protected claseEstado(estado: EstadoPracticante): string {
     return `insignia insignia--${estado.toLowerCase()}`;
   }
 
-  protected tamano(bytes: number): string {
-    return formatearTamano(bytes);
+  protected clasePuntaje(puntaje: number): string {
+    return puntaje >= 70 ? 'alto' : puntaje >= 50 ? 'medio' : 'bajo';
   }
 }
 
 function normalizar(texto: string): string {
-  return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  // Quita las tildes: "Díaz" → "Diaz" (con NFD, cada tilde queda como una marca aparte).
+  return texto.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
 }

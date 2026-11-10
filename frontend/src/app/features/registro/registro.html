@@ -9,8 +9,27 @@
     <ol class="pasos">
       <li><span>1</span> Completa tus datos básicos.</li>
       <li><span>2</span> Adjunta tu hoja de vida en PDF.</li>
-      <li><span>3</span> Un analista revisa tu postulación.</li>
+      <li><span>3</span> Un analista la califica con una rúbrica de calidad.</li>
     </ol>
+
+    <div class="consejos">
+      <h2>Antes de enviar tu hoja de vida</h2>
+      <p class="texto-secundario">Se evalúa con estos criterios:</p>
+      <ul>
+        <li>
+          <strong>Ortografía y redacción:</strong> revisa tildes y puntuación; los errores restan
+          puntos.
+        </li>
+        <li><strong>Presentación:</strong> 1 o 2 páginas, ordenada y con tus datos de contacto.</li>
+        <li>
+          <strong>Formación, experiencia y habilidades:</strong> describe tus proyectos, tu rol y
+          las tecnologías que usaste.
+        </li>
+      </ul>
+      <p class="texto-secundario">
+        Exporta el documento como PDF simple: no se aceptan PDF con scripts ni archivos incrustados.
+      </p>
+    </div>
   </div>
 
   <div class="tarjeta registro__formulario">
@@ -152,6 +171,25 @@
             (change)="alSeleccionarArchivo($event)"
           />
           <p class="campo__error" id="error-hojaDeVida">{{ error('hojaDeVida') }}</p>
+        </div>
+
+        <div class="campo">
+          <label class="autorizacion" [class.invalido-texto]="error('autorizaTratamientoDatos')">
+            <input
+              type="checkbox"
+              formControlName="autorizaTratamientoDatos"
+              aria-describedby="error-autorizaTratamientoDatos"
+              (change)="limpiarErrorServidor('autorizaTratamientoDatos')"
+            />
+            <span>
+              Autorizo el tratamiento de mis datos personales y de mi hoja de vida exclusivamente
+              para este proceso de selección, conforme a la Ley 1581 de 2012.
+              <span class="obligatorio">*</span>
+            </span>
+          </label>
+          <p class="campo__error" id="error-autorizaTratamientoDatos">
+            {{ error('autorizaTratamientoDatos') }}
+          </p>
         </div>
 
         <button type="submit" class="boton boton--primario boton--bloque" [disabled]="enviando()">

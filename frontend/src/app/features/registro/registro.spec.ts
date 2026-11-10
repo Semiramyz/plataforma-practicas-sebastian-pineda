@@ -52,7 +52,14 @@ describe('Registro', () => {
     semestre.selectedIndex = 8; // 8.º semestre (el índice 0 es "Selecciona")
     semestre.dispatchEvent(new Event('change'));
     adjuntar(new File(['%PDF-1.4'], 'cv.pdf', { type: 'application/pdf' }));
+    autorizar();
     await fixture.whenStable();
+  }
+
+  function autorizar(): void {
+    const casilla = elemento.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    casilla.checked = true;
+    casilla.dispatchEvent(new Event('change'));
   }
 
   it('muestra los errores de los campos obligatorios y no envía nada', async () => {
@@ -63,7 +70,41 @@ describe('Registro', () => {
     expect(error('carrera')).toBe('Escribe tu carrera universitaria.');
     expect(error('semestre')).toBe('Selecciona tu semestre actual.');
     expect(error('hojaDeVida')).toBe('Adjunta tu hoja de vida en PDF.');
+    expect(error('autorizaTratamientoDatos')).toContain('Debes autorizar');
     backend.expectNone('/api/practicantes');
+  });
+
+  it.each([
+    ['Ana 123', 'solo puede contener letras'],
+    ['<script>', 'solo puede contener letras'],
+    ['Ana', 'al menos un apellido'],
+    ['Annnna Gómez', 'letras repetidas'],
+  ])('rechaza el nombre "%s"', async (nombre, mensaje) => {
+    escribir('nombreCompleto', nombre);
+    await enviar();
+
+    expect(error('nombreCompleto')).toContain(mensaje);
+  });
+
+  it('no envía si falta la autorización de datos aunque lo demás esté bien', async () => {
+    await llenarFormularioValido();
+    const casilla = elemento.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    casilla.checked = false;
+    casilla.dispatchEvent(new Event('change'));
+    await enviar();
+
+    backend.expectNone('/api/practicantes');
+    expect(error('autorizaTratamientoDatos')).toContain('Debes autorizar');
+  });
+
+  it('envía el nombre en formato de nombre propio si llegó en mayúsculas', async () => {
+    await llenarFormularioValido();
+    escribir('nombreCompleto', 'ANA MARÍA DE LA ROSA');
+    await enviar();
+
+    const cuerpo = backend.expectOne('/api/practicantes').request.body as FormData;
+    expect(cuerpo.get('nombreCompleto')).toBe('Ana María de la Rosa');
+    expect(cuerpo.get('autorizaTratamientoDatos')).toBe('true');
   });
 
   it('rechaza un nombre con solo espacios y un correo inválido', async () => {
@@ -108,15 +149,13 @@ describe('Registro', () => {
     await llenarFormularioValido();
     await enviar();
 
-    backend
-      .expectOne('/api/practicantes')
-      .flush(
-        {
-          title: 'Correo ya registrado',
-          detail: 'Ya existe un practicante registrado con el correo ana@correo.com.',
-        },
-        { status: 409, statusText: 'Conflict' },
-      );
+    backend.expectOne('/api/practicantes').flush(
+      {
+        title: 'Correo ya registrado',
+        detail: 'Ya existe un practicante registrado con el correo ana@correo.com.',
+      },
+      { status: 409, statusText: 'Conflict' },
+    );
     await fixture.whenStable();
 
     expect(elemento.querySelector('[role="alert"]')?.textContent).toContain(

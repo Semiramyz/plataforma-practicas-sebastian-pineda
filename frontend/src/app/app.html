@@ -1,15 +1,24 @@
+<!-- Primer elemento enfocable: permite saltar la navegación con el teclado (WCAG 2.4.1). -->
+<a class="saltar-contenido" href="#contenido" (click)="saltarAlContenido($event)">
+  Saltar al contenido principal
+</a>
+
 <header class="barra">
   <div class="contenedor barra__contenido">
-    <a routerLink="/registro" class="marca" aria-label="Plataforma de Prácticas, inicio">
+    <a routerLink="/registro" class="marca">
       <span class="marca__logo" aria-hidden="true">P</span>
       <span class="marca__texto">Plataforma de <strong>Prácticas</strong></span>
     </a>
 
     <nav class="navegacion" aria-label="Principal">
-      <a routerLink="/registro" routerLinkActive="activo">Registro</a>
-      <a routerLink="/analista" routerLinkActive="activo">Panel de analista</a>
+      <a routerLink="/registro" routerLinkActive="activo" ariaCurrentWhenActive="page">Registro</a>
+      <a routerLink="/analista" routerLinkActive="activo" ariaCurrentWhenActive="page">
+        Panel de analista
+      </a>
       @if (auth.nombre(); as nombre) {
-        <span class="navegacion__usuario" title="Sesión iniciada">{{ nombre }}</span>
+        <span class="navegacion__usuario">
+          <span class="oculto-visualmente">Sesión iniciada como</span> {{ nombre }}
+        </span>
         <button type="button" class="boton boton--fantasma boton--pequeno" (click)="cerrarSesion()">
           Cerrar sesión
         </button>
@@ -18,7 +27,7 @@
   </div>
 </header>
 
-<main class="contenedor principal">
+<main id="contenido" class="contenedor principal" tabindex="-1">
   <router-outlet />
 </main>
 

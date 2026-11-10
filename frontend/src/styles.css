@@ -7,7 +7,7 @@
   --exito-suave: #e3f5ec;
   --peligro: #c0362c;
   --peligro-suave: #fdecea;
-  --aviso: #b26a00;
+  --aviso: #8a5200; /* contraste 5,9:1 sobre --aviso-suave (WCAG AA) */
   --aviso-suave: #fff4e0;
 
   --texto: #18202f;
@@ -180,6 +180,39 @@ a {
   white-space: nowrap;
 }
 
+/* Enlace "Saltar al contenido": invisible hasta que recibe el foco con el teclado. */
+.saltar-contenido {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 10;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  background: var(--primario);
+  color: #fff;
+  font-weight: 600;
+  transform: translateY(-150%);
+}
+
+.saltar-contenido:focus {
+  transform: none;
+}
+
+main:focus {
+  outline: none;
+}
+
+/* Respeta la preferencia del sistema de reducir animaciones (WCAG 2.3.3). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ---------- Formularios ---------- */
 .campo {
   display: grid;
@@ -245,6 +278,7 @@ select.invalido {
   border-radius: 8px;
   font: inherit;
   font-weight: 600;
+  text-decoration: none;
   cursor: pointer;
   transition:
     background 0.15s,
@@ -377,7 +411,7 @@ select.invalido {
   font-size: 0.93rem;
 }
 
-.tabla th {
+.tabla thead th {
   padding: 0.75rem 1rem;
   background: var(--fondo-suave);
   color: var(--texto-secundario);
@@ -388,7 +422,8 @@ select.invalido {
   text-transform: uppercase;
 }
 
-.tabla td {
+.tabla td,
+.tabla tbody th {
   padding: 0.85rem 1rem;
   border-top: 1px solid var(--borde);
   vertical-align: middle;

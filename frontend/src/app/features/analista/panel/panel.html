@@ -2,6 +2,12 @@
   <div>
     <p class="etiqueta">Selección de practicantes</p>
     <h1>Panel de analista</h1>
+    <p class="texto-secundario">
+      Abre cada postulación para revisar la hoja de vida y calificarla con la rúbrica de calidad.
+      @if (puntajePromedio() !== null) {
+        Puntaje promedio de las evaluadas: <strong>{{ puntajePromedio() }}/100</strong>.
+      }
+    </p>
   </div>
   <button type="button" class="boton boton--secundario" (click)="cargar()" [disabled]="cargando()">
     {{ cargando() ? 'Actualizando…' : 'Actualizar' }}
@@ -24,163 +30,93 @@
   }
 </div>
 
-<div class="espacio-trabajo" [class.espacio-trabajo--con-detalle]="seleccionado()">
-  <section class="tarjeta listado" aria-label="Practicantes registrados">
-    <div class="listado__barra">
-      <input
-        type="search"
-        placeholder="Buscar por nombre, correo o carrera"
-        aria-label="Buscar practicante"
-        [value]="busqueda()"
-        (input)="buscar($event)"
-      />
+<section class="tarjeta listado" aria-label="Practicantes registrados">
+  <div class="listado__barra">
+    <input
+      type="search"
+      placeholder="Buscar por nombre, correo o carrera"
+      aria-label="Buscar practicante"
+      [value]="busqueda()"
+      (input)="buscar($event)"
+    />
+    <select aria-label="Ordenar" [value]="orden()" (change)="ordenar($event)">
+      <option value="recientes">Más recientes</option>
+      <option value="antiguos">Más antiguos</option>
+      <option value="puntaje">Mayor puntaje</option>
+    </select>
+  </div>
+
+  @if (cargando() && practicantes().length === 0) {
+    <p class="vacio">Cargando practicantes…</p>
+  } @else if (errorCarga(); as error) {
+    <div class="vacio">
+      <p>{{ error }}</p>
+      <button type="button" class="boton boton--secundario" (click)="cargar()">Reintentar</button>
     </div>
-
-    @if (cargando() && practicantes().length === 0) {
-      <p class="vacio">Cargando practicantes…</p>
-    } @else if (errorCarga(); as error) {
-      <div class="vacio">
-        <p>{{ error }}</p>
-        <button type="button" class="boton boton--secundario" (click)="cargar()">Reintentar</button>
-      </div>
-    } @else if (visibles().length === 0) {
-      <p class="vacio">
-        {{
-          practicantes().length === 0
-            ? 'Aún no hay practicantes registrados.'
-            : 'No hay practicantes que coincidan con el filtro.'
-        }}
-      </p>
-    } @else {
-      <div class="tabla-contenedor">
-        <table class="tabla">
-          <thead>
+  } @else if (visibles().length === 0) {
+    <p class="vacio">
+      {{
+        practicantes().length === 0
+          ? 'Aún no hay practicantes registrados.'
+          : 'No hay practicantes que coincidan con el filtro.'
+      }}
+    </p>
+  } @else {
+    <div class="tabla-contenedor">
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th scope="col">Practicante</th>
+            <th scope="col">Carrera</th>
+            <th scope="col" class="centrado">Semestre</th>
+            <th scope="col">Registro</th>
+            <th scope="col">Puntaje</th>
+            <th scope="col">Estado</th>
+            <th scope="col"><span class="oculto-visualmente">Acción</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (p of visibles(); track p.id) {
             <tr>
-              <th scope="col">Practicante</th>
-              <th scope="col">Carrera</th>
-              <th scope="col" class="centrado">Semestre</th>
-              <th scope="col">Registro</th>
-              <th scope="col">Estado</th>
+              <th scope="row">
+                <a class="nombre" [routerLink]="['/analista/practicantes', p.id]">{{
+                  p.nombreCompleto
+                }}</a>
+                <small>{{ p.correo }}</small>
+              </th>
+              <td>{{ p.carrera }}</td>
+              <td class="centrado">{{ p.semestre }}</td>
+              <td>{{ p.fechaRegistroUtc | date: 'd MMM y' }}</td>
+              <td>
+                @if (p.evaluacion; as ev) {
+                  <span class="puntaje puntaje--{{ clasePuntaje(ev.puntajeTotal) }}">
+                    {{ ev.puntajeTotal }}<small>/100</small>
+                  </span>
+                } @else {
+                  <span class="texto-secundario">—</span>
+                }
+              </td>
+              <td>
+                <span [class]="claseEstado(p.estado)">{{ etiquetas[p.estado] }}</span>
+                @if (p.borrador) {
+                  <small class="en-evaluacion">En evaluación</small>
+                }
+              </td>
+              <td class="derecha">
+                <a
+                  class="boton boton--pequeno"
+                  [class.boton--primario]="p.estado === 'Pendiente'"
+                  [class.boton--secundario]="p.estado !== 'Pendiente'"
+                  [routerLink]="['/analista/practicantes', p.id]"
+                >
+                  {{ p.estado !== 'Pendiente' ? 'Ver' : p.borrador ? 'Continuar' : 'Evaluar' }}
+                  <span class="oculto-visualmente">: {{ p.nombreCompleto }}</span>
+                </a>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            @for (p of visibles(); track p.id) {
-              <tr
-                tabindex="0"
-                [class.seleccionada]="p.id === seleccionadoId()"
-                [attr.aria-selected]="p.id === seleccionadoId()"
-                (click)="seleccionar(p)"
-                (keydown.enter)="seleccionar(p)"
-              >
-                <td>
-                  <strong>{{ p.nombreCompleto }}</strong>
-                  <small>{{ p.correo }}</small>
-                </td>
-                <td>{{ p.carrera }}</td>
-                <td class="centrado">{{ p.semestre }}</td>
-                <td>{{ p.fechaRegistroUtc | date: 'd MMM y' }}</td>
-                <td>
-                  <span [class]="claseEstado(p.estado)">{{ etiquetas[p.estado] }}</span>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    }
-  </section>
-
-  @if (seleccionado(); as p) {
-    <aside class="tarjeta detalle" aria-label="Detalle del practicante">
-      <div class="detalle__cabecera">
-        <div>
-          <span [class]="claseEstado(p.estado)">{{ etiquetas[p.estado] }}</span>
-          <h2>{{ p.nombreCompleto }}</h2>
-        </div>
-        <button type="button" class="cerrar" aria-label="Cerrar detalle" (click)="cerrarDetalle()">
-          ×
-        </button>
-      </div>
-
-      <dl class="datos">
-        <dt>Correo</dt>
-        <dd>
-          <a [href]="'mailto:' + p.correo">{{ p.correo }}</a>
-        </dd>
-        <dt>Carrera</dt>
-        <dd>{{ p.carrera }}</dd>
-        <dt>Semestre</dt>
-        <dd>{{ p.semestre }}.º semestre</dd>
-        <dt>Registrado</dt>
-        <dd>{{ p.fechaRegistroUtc | date: 'd MMM y, h:mm a' }}</dd>
-        <dt>Evaluado</dt>
-        <dd>
-          {{
-            p.fechaEvaluacionUtc ? (p.fechaEvaluacionUtc | date: 'd MMM y, h:mm a') : 'Sin evaluar'
-          }}
-        </dd>
-      </dl>
-
-      <div class="hoja-de-vida">
-        <span class="hoja-de-vida__icono" aria-hidden="true">PDF</span>
-        <div class="hoja-de-vida__datos">
-          <strong>{{ p.hojaDeVidaNombre }}</strong>
-          <small>{{ tamano(p.hojaDeVidaTamanoBytes) }}</small>
-        </div>
-      </div>
-      <div class="acciones">
-        <button
-          type="button"
-          class="boton boton--secundario"
-          [disabled]="descargando()"
-          (click)="hojaDeVida(p, 'ver')"
-        >
-          Ver PDF
-        </button>
-        <button
-          type="button"
-          class="boton boton--secundario"
-          [disabled]="descargando()"
-          (click)="hojaDeVida(p, 'descargar')"
-        >
-          Descargar
-        </button>
-      </div>
-
-      <h3>Decisión</h3>
-      <div class="acciones">
-        <button
-          type="button"
-          class="boton boton--exito"
-          [class.boton--marcado]="p.estado === 'Viable'"
-          [attr.aria-pressed]="p.estado === 'Viable'"
-          [disabled]="guardando() !== null"
-          (click)="evaluar(p, 'Viable')"
-        >
-          {{ guardando() === 'Viable' ? 'Guardando…' : 'Viable' }}
-        </button>
-        <button
-          type="button"
-          class="boton boton--peligro"
-          [class.boton--marcado]="p.estado === 'NoViable'"
-          [attr.aria-pressed]="p.estado === 'NoViable'"
-          [disabled]="guardando() !== null"
-          (click)="evaluar(p, 'NoViable')"
-        >
-          {{ guardando() === 'NoViable' ? 'Guardando…' : 'No viable' }}
-        </button>
-      </div>
-
-      @if (mensaje(); as m) {
-        <div
-          class="alerta"
-          [class.alerta--exito]="m.tipo === 'exito'"
-          [class.alerta--error]="m.tipo === 'error'"
-          role="status"
-        >
-          {{ m.texto }}
-        </div>
-      }
-    </aside>
+          }
+        </tbody>
+      </table>
+    </div>
   }
-</div>
+</section>

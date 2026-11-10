@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
+import { cambiosSinGuardarGuard } from './core/auth/cambios-sin-guardar.guard';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'registro' },
@@ -18,6 +19,14 @@ export const routes: Routes = [
     title: 'Panel de analista',
     canActivate: [authGuard],
     loadComponent: () => import('./features/analista/panel/panel').then((m) => m.Panel),
+  },
+  {
+    path: 'analista/practicantes/:id',
+    title: 'Evaluación de hoja de vida',
+    canActivate: [authGuard],
+    canDeactivate: [cambiosSinGuardarGuard],
+    loadComponent: () =>
+      import('./features/analista/evaluacion/evaluacion').then((m) => m.EvaluacionPagina),
   },
   { path: '**', redirectTo: 'registro' },
 ];

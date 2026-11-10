@@ -7,16 +7,23 @@ import { formatearTamano, interpretarError } from '../../core/utils/errores-http
 import {
   TAMANO_MAXIMO_HOJA_DE_VIDA,
   archivoPdf,
+  correoCompleto,
   noVacio,
+  nombrePersona,
+  textoCarrera,
 } from '../../core/validators/formulario.validators';
 
-type Campo = 'nombreCompleto' | 'correo' | 'carrera' | 'semestre' | 'hojaDeVida';
+type Campo =
+  'nombreCompleto' | 'correo' | 'carrera' | 'semestre' | 'hojaDeVida' | 'autorizaTratamientoDatos';
 
 const MENSAJES: Record<Campo, Record<string, string>> = {
   nombreCompleto: {
     required: 'Escribe tu nombre completo.',
     minlength: 'El nombre debe tener al menos 3 caracteres.',
     maxlength: 'El nombre no puede superar 150 caracteres.',
+    caracteresNombre: 'El nombre solo puede contener letras, espacios, apóstrofes y guiones.',
+    nombreIncompleto: 'Escribe tu nombre y al menos un apellido.',
+    letrasRepetidas: 'El nombre tiene letras repetidas de forma inusual; revísalo.',
   },
   correo: {
     required: 'Escribe tu correo electrónico.',
@@ -27,6 +34,11 @@ const MENSAJES: Record<Campo, Record<string, string>> = {
     required: 'Escribe tu carrera universitaria.',
     minlength: 'La carrera debe tener al menos 2 caracteres.',
     maxlength: 'La carrera no puede superar 150 caracteres.',
+    caracteresCarrera:
+      'La carrera solo puede contener letras, números y signos básicos de puntuación.',
+  },
+  autorizaTratamientoDatos: {
+    required: 'Debes autorizar el tratamiento de tus datos personales para registrarte.',
   },
   semestre: {
     required: 'Selecciona tu semestre actual.',
@@ -40,6 +52,25 @@ const MENSAJES: Record<Campo, Record<string, string>> = {
     tamanoArchivo: `El archivo no puede superar ${formatearTamano(TAMANO_MAXIMO_HOJA_DE_VIDA)}.`,
   },
 };
+
+const PARTICULAS = new Set(['de', 'del', 'la', 'las', 'los', 'y', 'e', 'da', 'van', 'von']);
+
+/** "ANA DE LA ROSA" o "ana de la rosa" → "Ana de la Rosa" (igual que la API). */
+export function formatoNombrePropio(nombre: string): string {
+  const limpio = nombre.trim().replace(/\s+/g, ' ');
+  if (limpio !== limpio.toUpperCase() && limpio !== limpio.toLowerCase()) {
+    return limpio;
+  }
+  return limpio
+    .toLocaleLowerCase('es-CO')
+    .split(' ')
+    .map((palabra, i) =>
+      i > 0 && PARTICULAS.has(palabra)
+        ? palabra
+        : palabra.charAt(0).toLocaleUpperCase('es-CO') + palabra.slice(1),
+    )
+    .join(' ');
+}
 
 @Component({
   selector: 'app-registro',
@@ -68,12 +99,24 @@ export class Registro {
   protected readonly formulario = this.fb.group({
     nombreCompleto: [
       '',
-      [Validators.required, noVacio, Validators.minLength(3), Validators.maxLength(150)],
+      [
+        Validators.required,
+        noVacio,
+        Validators.minLength(3),
+        Validators.maxLength(150),
+        nombrePersona,
+      ],
     ],
-    correo: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
+    correo: ['', [Validators.required, correoCompleto, Validators.maxLength(254)]],
     carrera: [
       '',
-      [Validators.required, noVacio, Validators.minLength(2), Validators.maxLength(150)],
+      [
+        Validators.required,
+        noVacio,
+        Validators.minLength(2),
+        Validators.maxLength(150),
+        textoCarrera,
+      ],
     ],
     semestre: this.fb.control<number | null>(null, [
       Validators.required,
@@ -81,6 +124,7 @@ export class Registro {
       Validators.max(12),
     ]),
     hojaDeVida: this.fb.control<File | null>(null, [Validators.required, archivoPdf()]),
+    autorizaTratamientoDatos: [false, Validators.requiredTrue],
   });
 
   protected readonly enviando = signal(false);
@@ -154,11 +198,12 @@ export class Registro {
     this.enviando.set(true);
     this.servicio
       .registrar({
-        nombreCompleto: datos.nombreCompleto.trim(),
+        nombreCompleto: formatoNombrePropio(datos.nombreCompleto),
         correo: datos.correo.trim(),
-        carrera: datos.carrera.trim(),
+        carrera: datos.carrera.trim().replace(/\s+/g, ' '),
         semestre: datos.semestre!,
         hojaDeVida: datos.hojaDeVida!,
+        autorizaTratamientoDatos: datos.autorizaTratamientoDatos,
       })
       .subscribe({
         next: (registro) => {

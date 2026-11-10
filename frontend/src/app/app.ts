@@ -12,8 +12,21 @@ export class App {
   private readonly router = inject(Router);
   protected readonly anio = new Date().getFullYear();
 
+  /**
+   * Lleva el foco al contenido principal. Se hace por código porque con `<base href="/">`
+   * un enlace "#contenido" navegaría a la raíz del sitio en lugar de quedarse en la página.
+   */
+  protected saltarAlContenido(evento: Event): void {
+    evento.preventDefault();
+    document.getElementById('contenido')?.focus();
+  }
+
   protected cerrarSesion(): void {
-    this.auth.cerrarSesion();
-    void this.router.navigate(['/analista/login']);
+    // Primero se navega (el guard puede pedir confirmar una evaluación sin guardar) y luego se cierra.
+    void this.router.navigate(['/analista/login']).then((navego) => {
+      if (navego) {
+        this.auth.cerrarSesion();
+      }
+    });
   }
 }

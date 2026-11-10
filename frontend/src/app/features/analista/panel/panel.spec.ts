@@ -1,35 +1,9 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Practicante } from '../../../core/models/practicante.model';
+import { provideRouter } from '@angular/router';
+import { PRACTICANTES } from '../../../testing/datos-prueba';
 import { Panel } from './panel';
-
-const PRACTICANTES: Practicante[] = [
-  {
-    id: 2,
-    nombreCompleto: 'Carlos Díaz',
-    correo: 'carlos@correo.com',
-    carrera: 'Ingeniería Industrial',
-    semestre: 6,
-    estado: 'Pendiente',
-    fechaRegistroUtc: '2026-11-08T15:00:00Z',
-    fechaEvaluacionUtc: null,
-    hojaDeVidaNombre: 'cv-carlos.pdf',
-    hojaDeVidaTamanoBytes: 120_000,
-  },
-  {
-    id: 1,
-    nombreCompleto: 'Laura Ríos',
-    correo: 'laura@correo.com',
-    carrera: 'Ingeniería de Sistemas',
-    semestre: 8,
-    estado: 'Viable',
-    fechaRegistroUtc: '2026-11-07T15:00:00Z',
-    fechaEvaluacionUtc: '2026-11-08T10:00:00Z',
-    hojaDeVidaNombre: 'cv-laura.pdf',
-    hojaDeVidaTamanoBytes: 80_000,
-  },
-];
 
 describe('Panel', () => {
   let fixture: ComponentFixture<Panel>;
@@ -39,7 +13,7 @@ describe('Panel', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [Panel],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
 
     fixture = TestBed.createComponent(Panel);
@@ -53,19 +27,20 @@ describe('Panel', () => {
   afterEach(() => backend.verify());
 
   const filas = () => Array.from(elemento.querySelectorAll<HTMLTableRowElement>('tbody tr'));
+  const nombres = () => filas().map((f) => f.querySelector('a.nombre')?.textContent?.trim());
   const indicador = (texto: string) =>
     Array.from(elemento.querySelectorAll<HTMLButtonElement>('.indicador')).find((b) =>
       b.textContent?.includes(texto),
     )!;
 
-  it('lista los practicantes con su estado y muestra los totales', () => {
-    expect(filas().map((f) => f.querySelector('strong')?.textContent)).toEqual([
-      'Carlos Díaz',
-      'Laura Ríos',
-    ]);
+  it('lista los practicantes con su estado, puntaje y totales', () => {
+    expect(nombres()).toEqual(['Carlos Díaz', 'Laura Ríos']);
+    expect(filas()[0].textContent).toContain('—');
+    expect(filas()[1].querySelector('.puntaje')?.textContent).toContain('80');
     expect(indicador('Registrados').textContent).toContain('2');
-    expect(indicador('Pendientes').textContent).toContain('1');
+    expect(indicador('Por evaluar').textContent).toContain('1');
     expect(indicador('Viables').textContent).toContain('1');
+    expect(elemento.textContent).toContain('80/100');
   });
 
   it('filtra por estado y por texto sin distinguir tildes', async () => {
@@ -79,52 +54,56 @@ describe('Panel', () => {
     buscador.dispatchEvent(new Event('input'));
     await fixture.whenStable();
 
-    expect(filas().map((f) => f.querySelector('strong')?.textContent)).toEqual(['Carlos Díaz']);
+    expect(nombres()).toEqual(['Carlos Díaz']);
   });
 
-  it('muestra el detalle y marca al practicante como viable', async () => {
-    filas()[0].click();
+  it('ordena por puntaje', async () => {
+    const orden = elemento.querySelector<HTMLSelectElement>('select')!;
+    orden.value = 'puntaje';
+    orden.dispatchEvent(new Event('change'));
     await fixture.whenStable();
 
-    const detalle = elemento.querySelector('aside')!;
-    expect(detalle.textContent).toContain('carlos@correo.com');
-    expect(detalle.textContent).toContain('cv-carlos.pdf');
-
-    const botonViable = Array.from(detalle.querySelectorAll<HTMLButtonElement>('button')).find(
-      (b) => b.textContent?.trim() === 'Viable',
-    )!;
-    botonViable.click();
-
-    const solicitud = backend.expectOne('/api/practicantes/2/estado');
-    expect(solicitud.request.method).toBe('PATCH');
-    expect(solicitud.request.body).toEqual({ estado: 'Viable' });
-    solicitud.flush({
-      ...PRACTICANTES[0],
-      estado: 'Viable',
-      fechaEvaluacionUtc: '2026-11-08T16:00:00Z',
-    });
-    await fixture.whenStable();
-
-    expect(filas()[0].querySelector('.insignia')?.textContent).toBe('Viable');
-    expect(indicador('Viables').textContent).toContain('2');
-    expect(detalle.querySelector('[role="status"]')?.textContent).toContain(
-      'marcado como "Viable"',
-    );
+    expect(nombres()).toEqual(['Laura Ríos', 'Carlos Díaz']);
   });
 
-  it('marca al practicante como no viable', async () => {
-    filas()[1].click();
-    await fixture.whenStable();
+  it('enlaza el nombre de cada practicante con su evaluación (accesible con teclado)', () => {
+    const enlace = filas()[0].querySelector<HTMLAnchorElement>('a.nombre')!;
 
-    Array.from(elemento.querySelectorAll<HTMLButtonElement>('aside button'))
-      .find((b) => b.textContent?.trim() === 'No viable')!
+    expect(enlace.getAttribute('href')).toBe('/analista/practicantes/2');
+    expect(filas()[0].querySelector('th')?.getAttribute('scope')).toBe('row');
+  });
+
+  const accion = (fila: number) =>
+    filas()[fila].querySelector('td.derecha a')?.textContent?.replace(/\s+/g, ' ').trim();
+
+  it('muestra "Evaluar" para pendientes y "Ver" para evaluados, con el nombre para lectores de pantalla', () => {
+    expect(accion(0)).toBe('Evaluar : Carlos Díaz');
+    expect(accion(1)).toBe('Ver : Laura Ríos');
+    expect(filas()[0].querySelector('.oculto-visualmente')?.textContent).toContain('Carlos Díaz');
+  });
+
+  it('marca "En evaluación" y ofrece continuar cuando hay un avance guardado', async () => {
+    Array.from(elemento.querySelectorAll<HTMLButtonElement>('button'))
+      .find((b) => b.textContent?.includes('Actualizar'))!
       .click();
-
-    const solicitud = backend.expectOne('/api/practicantes/1/estado');
-    expect(solicitud.request.body).toEqual({ estado: 'NoViable' });
-    solicitud.flush({ ...PRACTICANTES[1], estado: 'NoViable' });
+    backend.expectOne('/api/practicantes').flush([
+      {
+        ...PRACTICANTES[0],
+        borrador: {
+          calificacion: { ortografia: 3 },
+          decision: null,
+          motivosRechazo: [],
+          observaciones: null,
+          evaluador: 'Analista de selección',
+          fechaActualizacionUtc: '2026-11-09T21:00:00Z',
+        },
+      },
+      PRACTICANTES[1],
+    ]);
     await fixture.whenStable();
 
-    expect(indicador('No viables').textContent).toContain('1');
+    expect(filas()[0].textContent).toContain('En evaluación');
+    expect(accion(0)).toContain('Continuar');
+    expect(filas()[1].textContent).not.toContain('En evaluación');
   });
 });

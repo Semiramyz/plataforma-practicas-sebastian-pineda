@@ -1,0 +1,432 @@
+<a routerLink="/analista" class="volver">← Volver al panel</a>
+
+@if (cargando() && !practicante()) {
+  <p class="tarjeta vacio">Cargando practicante…</p>
+} @else if (errorCarga(); as error) {
+  <div class="tarjeta vacio">
+    <p>{{ error }}</p>
+    <a routerLink="/analista" class="boton boton--secundario">Ir al panel</a>
+  </div>
+} @else if (practicante(); as p) {
+  <header class="cabecera">
+    <div>
+      <p class="etiqueta">Evaluación de hoja de vida · #{{ p.id }}</p>
+      <h1>{{ p.nombreCompleto }}</h1>
+      <ul class="datos-rapidos">
+        <li>{{ p.carrera }}</li>
+        <li>{{ p.semestre }}.º semestre</li>
+        <li>
+          <a [href]="'mailto:' + p.correo">{{ p.correo }}</a>
+        </li>
+        <li>Registrado el {{ p.fechaRegistroUtc | date: 'd MMM y, h:mm a' }}</li>
+      </ul>
+    </div>
+    <span [class]="claseEstado(p.estado) + ' insignia--grande'">{{
+      etiquetasEstado[p.estado]
+    }}</span>
+  </header>
+
+  @if (mensajeExito(); as mensaje) {
+    <div class="alerta alerta--exito aviso-guardado" role="status">
+      <span>{{ mensaje }}</span>
+      @if (siguientePendiente()) {
+        <button type="button" class="boton boton--primario boton--pequeno" (click)="irASiguiente()">
+          Evaluar siguiente pendiente →
+        </button>
+      } @else {
+        <a routerLink="/analista" class="boton boton--secundario boton--pequeno">Volver al panel</a>
+      }
+    </div>
+  }
+
+  <div class="espacio">
+    <!-- ---------- Visor de la hoja de vida ---------- -->
+    <section class="tarjeta visor" aria-label="Hoja de vida">
+      <div class="visor__barra">
+        <span class="visor__icono" aria-hidden="true">PDF</span>
+        <span class="visor__nombre">
+          <strong>{{ p.hojaDeVidaNombre }}</strong>
+          <small>{{ tamano(p.hojaDeVidaTamanoBytes) }}</small>
+        </span>
+        <button
+          type="button"
+          class="boton boton--fantasma boton--pequeno"
+          [disabled]="estadoPdf() !== 'listo'"
+          (click)="abrirPdf()"
+        >
+          Abrir aparte
+        </button>
+        <button
+          type="button"
+          class="boton boton--secundario boton--pequeno"
+          [disabled]="estadoPdf() !== 'listo'"
+          (click)="descargarPdf()"
+        >
+          Descargar
+        </button>
+      </div>
+      @switch (estadoPdf()) {
+        @case ('cargando') {
+          <p class="visor__estado">Cargando hoja de vida…</p>
+        }
+        @case ('error') {
+          <p class="visor__estado">No fue posible cargar la hoja de vida.</p>
+        }
+        @default {
+          <iframe
+            class="visor__pdf"
+            [src]="urlPdfSegura()"
+            title="Hoja de vida de {{ p.nombreCompleto }}"
+          ></iframe>
+        }
+      }
+    </section>
+
+    <!-- ---------- Evaluación ---------- -->
+    <section class="tarjeta panel-evaluacion" aria-label="Evaluación">
+      @if (!editando() && p.evaluacion; as ev) {
+        <!-- Resumen de una evaluación guardada -->
+        <div class="resumen">
+          <div class="resultado">
+            <div class="resultado__puntaje">
+              <strong>{{ ev.puntajeTotal }}</strong
+              ><span>/100</span>
+            </div>
+            <div>
+              <p class="resultado__titulo">Promedio {{ ev.promedio | number: '1.1-1' }} de 5</p>
+              <p class="texto-secundario">
+                Evaluado por {{ ev.evaluador }} el
+                {{ p.fechaEvaluacionUtc | date: 'd MMM y, h:mm a' }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Cada sección de la rúbrica con el nivel que se le asignó, tal como quedó guardada. -->
+          <h2 class="subtitulo">Calificación por sección</h2>
+          <ul class="secciones-calificadas">
+            @for (criterio of criterios; track criterio.clave) {
+              @let nivel = ev.calificacion[criterio.clave];
+              <li class="seccion-calificada">
+                <div class="seccion-calificada__cabecera">
+                  <strong>{{ criterio.nombre }}</strong>
+                  <span class="nivel-insignia nivel-insignia--{{ nivel }}"
+                    >{{ nivel }}/5 · {{ niveles[nivel - 1] }}</span
+                  >
+                </div>
+                <span
+                  class="barra"
+                  role="meter"
+                  aria-valuemin="1"
+                  aria-valuemax="5"
+                  [attr.aria-valuenow]="nivel"
+                  [attr.aria-label]="criterio.nombre + ': ' + nivel + ' de 5'"
+                >
+                  <span
+                    class="barra__relleno nivel-{{ nivel }}"
+                    [style.width.%]="nivel * 20"
+                  ></span>
+                </span>
+                <p class="seccion-calificada__guia">{{ criterio.niveles[nivel - 1] }}</p>
+              </li>
+            }
+          </ul>
+
+          @if (ev.motivosRechazo.length > 0) {
+            <h2 class="subtitulo">Motivos de rechazo</h2>
+            <ul class="chips">
+              @for (motivo of ev.motivosRechazo; track motivo) {
+                <li>{{ etiquetasMotivo[motivo] }}</li>
+              }
+            </ul>
+          }
+
+          <h2 class="subtitulo">Comentario del evaluador</h2>
+          @if (ev.observaciones) {
+            <blockquote class="comentario">
+              <p>{{ ev.observaciones }}</p>
+              <footer>— {{ ev.evaluador }}</footer>
+            </blockquote>
+          } @else {
+            <p class="texto-secundario">Sin comentarios.</p>
+          }
+          @if (ev.recomendacion !== p.estado) {
+            <p class="alerta alerta--aviso">
+              La decisión difiere de la recomendación de la rúbrica ({{
+                etiquetasEstado[ev.recomendacion]
+              }}).
+            </p>
+          }
+          @if (p.historial.length > 0) {
+            <h2 class="subtitulo">Historial de decisiones</h2>
+            <ol
+              class="historial"
+              aria-label="Historial de evaluaciones, de la más reciente a la más antigua"
+            >
+              @for (registro of p.historial; track registro.fechaUtc; let primero = $first) {
+                <li>
+                  <span [class]="claseEstado(registro.decision)">{{
+                    etiquetasEstado[registro.decision]
+                  }}</span>
+                  <span>{{ registro.puntajeTotal }}/100</span>
+                  <span class="texto-secundario">
+                    {{ registro.evaluador }} · {{ registro.fechaUtc | date: 'd MMM y, h:mm a' }}
+                  </span>
+                  @if (primero) {
+                    <small class="historial__vigente">vigente</small>
+                  }
+                </li>
+              }
+            </ol>
+          }
+          <button type="button" class="boton boton--secundario boton--bloque" (click)="editar()">
+            Editar evaluación
+          </button>
+        </div>
+      } @else if (!editando()) {
+        <!-- Decisión anterior a la rúbrica (sin evaluación detallada) -->
+        <p class="texto-secundario">
+          Este practicante fue marcado como "{{ etiquetasEstado[p.estado] }}" sin rúbrica.
+        </p>
+        <button type="button" class="boton boton--primario boton--bloque" (click)="editar()">
+          Evaluar con la rúbrica
+        </button>
+      } @else {
+        <!-- Estado del guardado automático del avance en la base de datos -->
+        <div class="autoguardado" role="status" aria-live="polite">
+          @switch (estadoAutoguardado()) {
+            @case ('pendiente') {
+              <span class="autoguardado__punto autoguardado__punto--activo"></span> Guardando
+              avance…
+            }
+            @case ('guardando') {
+              <span class="autoguardado__punto autoguardado__punto--activo"></span> Guardando
+              avance…
+            }
+            @case ('guardado') {
+              <span class="autoguardado__punto autoguardado__punto--ok"></span> Avance guardado
+              automáticamente · {{ borradorGuardadoEn() | date: 'h:mm:ss a' }}
+            }
+            @case ('error') {
+              <span class="autoguardado__punto autoguardado__punto--error"></span> No se pudo
+              guardar el avance.
+              <button type="button" class="enlace" (click)="guardarBorradorAhora()">
+                Reintentar
+              </button>
+            }
+            @default {
+              @if (borradorGuardadoEn(); as fecha) {
+                <span class="autoguardado__punto autoguardado__punto--ok"></span> Avance guardado el
+                {{ fecha | date: 'd MMM, h:mm a' }}
+              } @else {
+                Tu avance se guarda automáticamente mientras calificas.
+              }
+            }
+          }
+        </div>
+
+        @if (borradorRecuperadoDe(); as fecha) {
+          <div class="alerta alerta--exito">
+            Se recuperó la evaluación que dejaste en curso el {{ fecha | date: 'd MMM, h:mm a' }}:
+            puedes continuar donde la dejaste.
+          </div>
+        }
+
+        <!-- Paso 1: rúbrica -->
+        <div class="paso">
+          <h2><span class="paso__numero">1</span> Califica la hoja de vida</h2>
+          <p class="texto-secundario paso__ayuda">
+            {{ calificados() }} de {{ criterios.length }} criterios · 1 = deficiente, 5 = excelente
+          </p>
+
+          @for (criterio of criterios; track criterio.clave) {
+            <fieldset class="criterio" [class.criterio--hecho]="nivelElegido(criterio.clave)">
+              <legend>{{ criterio.nombre }}</legend>
+              <p class="criterio__descripcion">{{ criterio.descripcion }}</p>
+              <div class="escala" role="radiogroup" [attr.aria-label]="criterio.nombre">
+                @for (valor of puntajes; track valor) {
+                  <label
+                    class="escala__opcion"
+                    [title]="niveles[valor - 1] + ': ' + criterio.niveles[valor - 1]"
+                  >
+                    <input
+                      type="radio"
+                      [name]="criterio.clave"
+                      [value]="valor"
+                      [checked]="nivelElegido(criterio.clave) === valor"
+                      (change)="calificar(criterio.clave, valor)"
+                    />
+                    <span>{{ valor }}</span>
+                  </label>
+                }
+              </div>
+              @if (nivelElegido(criterio.clave); as nivel) {
+                <p class="criterio__nivel nivel-texto-{{ nivel }}">
+                  <strong>{{ niveles[nivel - 1] }}:</strong> {{ criterio.niveles[nivel - 1] }}
+                </p>
+              }
+            </fieldset>
+          }
+        </div>
+
+        <!-- Resultado en vivo -->
+        @if (puntaje() !== null) {
+          <div class="resultado resultado--vivo" aria-live="polite">
+            <div class="resultado__puntaje">
+              <strong>{{ puntaje() }}</strong
+              ><span>/100</span>
+            </div>
+            <div>
+              <p class="resultado__titulo">
+                Recomendación:
+                <span [class]="claseEstado(recomendacion()!)">{{
+                  etiquetasEstado[recomendacion()!]
+                }}</span>
+              </p>
+              @for (razon of razonesRecomendacion(); track razon) {
+                <p class="resultado__razon">{{ razon }}</p>
+              } @empty {
+                <p class="resultado__razon">Cumple los estándares mínimos de calidad.</p>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Paso 2: decisión -->
+        <div class="paso" [class.paso--bloqueado]="!calificacionCompleta()">
+          <h2><span class="paso__numero">2</span> Decisión</h2>
+          @if (!calificacionCompleta()) {
+            <p class="texto-secundario paso__ayuda">
+              Disponible cuando califiques los {{ criterios.length }} criterios.
+            </p>
+          }
+          <div class="decisiones" role="radiogroup" aria-label="Decisión">
+            <label
+              class="decision decision--viable"
+              [class.decision--activa]="decision() === 'Viable'"
+            >
+              <input
+                type="radio"
+                name="decision"
+                value="Viable"
+                [checked]="decision() === 'Viable'"
+                [disabled]="!calificacionCompleta()"
+                (change)="elegirDecision('Viable')"
+              />
+              <strong>Viable</strong>
+              <small>Continúa en el proceso</small>
+            </label>
+            <label
+              class="decision decision--noviable"
+              [class.decision--activa]="decision() === 'NoViable'"
+            >
+              <input
+                type="radio"
+                name="decision"
+                value="NoViable"
+                [checked]="decision() === 'NoViable'"
+                [disabled]="!calificacionCompleta()"
+                (change)="elegirDecision('NoViable')"
+              />
+              <strong>No viable</strong>
+              <small>No continúa en el proceso</small>
+            </label>
+          </div>
+
+          @if (contradiceRecomendacion()) {
+            <p class="alerta alerta--aviso">
+              Tu decisión difiere de la recomendación de la rúbrica. Justifícala en las
+              observaciones.
+            </p>
+          }
+        </div>
+
+        <!-- Paso 3: motivos (solo No viable) -->
+        @if (decision() === 'NoViable') {
+          <fieldset class="paso motivos">
+            <legend><span class="paso__numero">3</span> Motivos del rechazo</legend>
+            @for (motivo of motivosDisponibles; track motivo.clave) {
+              <label class="motivo">
+                <input
+                  type="checkbox"
+                  [checked]="motivos().includes(motivo.clave)"
+                  (change)="alternarMotivo(motivo.clave, $any($event.target).checked)"
+                />
+                <span>{{ motivo.etiqueta }}</span>
+                @if (esSugerido(motivo.clave)) {
+                  <small class="sugerido">sugerido por la rúbrica</small>
+                }
+              </label>
+            }
+          </fieldset>
+        }
+
+        <!-- Observaciones -->
+        <div class="paso">
+          <label class="campo__etiqueta" for="observaciones">
+            Observaciones
+            @if (minimoObservaciones() > 0) {
+              <span class="obligatorio">(obligatorias)</span>
+            } @else {
+              <span class="texto-secundario">(opcionales)</span>
+            }
+          </label>
+          <textarea
+            id="observaciones"
+            rows="4"
+            [maxLength]="maximoObservaciones"
+            [value]="observaciones()"
+            placeholder="Ej.: Tiene 4 errores de tildes en el perfil profesional y la sección de proyectos no describe su rol."
+            (input)="escribirObservaciones($event)"
+          ></textarea>
+          <small class="contador">{{ observaciones().length }} / {{ maximoObservaciones }}</small>
+        </div>
+
+        @if (errorGuardado(); as error) {
+          <div class="alerta alerta--error" role="alert">{{ error }}</div>
+        }
+
+        @if (pendientes().length > 0) {
+          <div
+            #cajaPendientes
+            id="pendientes"
+            class="pendientes"
+            [class.pendientes--resaltado]="mostrarPendientes()"
+            tabindex="-1"
+            aria-live="polite"
+          >
+            <strong>
+              @if (mostrarPendientes()) {
+                Todavía no se puede guardar la evaluación. Falta:
+              } @else {
+                Para guardar la evaluación falta:
+              }
+            </strong>
+            <ul>
+              @for (pendiente of pendientes(); track pendiente) {
+                <li>{{ pendiente }}</li>
+              }
+            </ul>
+            <small>Mientras tanto, tu avance queda guardado como borrador.</small>
+          </div>
+        }
+
+        <div class="acciones-finales">
+          @if (p.estado !== 'Pendiente' || hayAvance()) {
+            <button type="button" class="boton boton--fantasma" (click)="cancelarEdicion()">
+              {{ p.estado !== 'Pendiente' ? 'Cancelar' : 'Descartar avance' }}
+            </button>
+          }
+          <button
+            type="button"
+            class="boton boton--primario"
+            [disabled]="guardando()"
+            [attr.aria-describedby]="pendientes().length > 0 ? 'pendientes' : null"
+            (click)="guardar()"
+          >
+            {{ guardando() ? 'Guardando…' : 'Guardar evaluación' }}
+          </button>
+        </div>
+      }
+    </section>
+  </div>
+}
