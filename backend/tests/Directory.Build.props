@@ -1,0 +1,12 @@
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+  <PropertyGroup>
+    <!--
+      Convenciones propias de las pruebas, no del código de producción:
+      CA1707: nombres Metodo_Escenario_Resultado con guion bajo.
+      CA1861: arreglos constantes como datos de cada caso de prueba.
+      CA1515 / CA1822: clases de prueba públicas y métodos de instancia que exige xUnit.
+    -->
+    <NoWarn>$(NoWarn);CA1707;CA1861;CA1515;CA1822</NoWarn>
+  </PropertyGroup>
+</Project>

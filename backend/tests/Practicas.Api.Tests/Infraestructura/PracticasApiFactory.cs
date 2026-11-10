@@ -2,7 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Practicas.Api.Contracts;
+using Practicas.Application.Autenticacion;
 
 namespace Practicas.Api.Tests.Infraestructura;
 
@@ -25,11 +25,22 @@ public sealed class PracticasApiFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Development");
         builder.UseSetting("ConnectionStrings:Practicas", $"Data Source={Path.Combine(_carpetaTemporal, "practicas.db")};Pooling=False");
         builder.UseSetting("Almacenamiento:RutaHojasDeVida", CarpetaHojasDeVida);
-        builder.UseSetting("Almacenamiento:TamanoMaximoBytes", (1024 * 1024).ToString());
+        builder.UseSetting("Almacenamiento:TamanoMaximoBytes", (1024 * 1024).ToString(System.Globalization.CultureInfo.InvariantCulture));
         builder.UseSetting("Autenticacion:ClaveFirma", "clave-para-pruebas-de-integracion-0123456789");
         builder.UseSetting("Autenticacion:Analista:Usuario", Usuario);
-        builder.UseSetting("Autenticacion:Analista:Contrasena", Contrasena);
+        builder.UseSetting("Autenticacion:Analista:ContrasenaHash", HashDePrueba);
+
+        // Límites altos para que las pruebas no choquen con el rate limiting (se prueba aparte).
+        builder.UseSetting("LimitesSolicitudes:IntentosLogin", LimiteIntentosLogin.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        builder.UseSetting("LimitesSolicitudes:RegistrosPorVentana", LimiteRegistros.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
+
+    /// <summary>Se calcula una vez: PBKDF2 es lento a propósito.</summary>
+    private static readonly string HashDePrueba = Practicas.Infrastructure.Autenticacion.HashContrasena.Crear(Contrasena);
+
+    public int LimiteIntentosLogin { get; init; } = 1000;
+
+    public int LimiteRegistros { get; init; } = 1000;
 
     /// <summary>Cliente con un JWT de analista válido.</summary>
     public async Task<HttpClient> CrearClienteAnalistaAsync()
@@ -38,7 +49,7 @@ public sealed class PracticasApiFactory : WebApplicationFactory<Program>
         var respuesta = await cliente.PostAsJsonAsync("/api/auth/login", new { usuario = Usuario, contrasena = Contrasena });
         respuesta.EnsureSuccessStatusCode();
 
-        var sesion = await respuesta.Content.ReadFromJsonAsync<LoginResponse>();
+        var sesion = await respuesta.Content.ReadFromJsonAsync<Sesion>();
         cliente.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", sesion!.Token);
         return cliente;
     }

@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Núcleo del negocio: sin dependencias de frameworks ni de otras capas. -->
+</Project>

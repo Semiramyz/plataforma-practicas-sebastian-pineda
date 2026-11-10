@@ -1,8 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc;
-using Practicas.Api.Contracts;
-using Practicas.Api.Domain;
+using Practicas.Application.Practicantes;
+using Practicas.Domain;
 using Practicas.Api.Tests.Infraestructura;
 
 namespace Practicas.Api.Tests.Integracion;
@@ -44,6 +44,48 @@ public class RegistroPracticanteTests : IClassFixture<PracticasApiFactory>
         Assert.Equal(FormularioPracticante.PdfMinimo, await File.ReadAllBytesAsync(archivoNuevo));
     }
 
+    [Theory]
+    [InlineData("ANA MARÍA DE LA ROSA", "Ana María de la Rosa")]
+    [InlineData("juan pérez", "Juan Pérez")]
+    [InlineData("María José McAllister", "María José McAllister")]
+    public async Task Registrar_NormalizaNombresEnMayusculasOMinusculas(string escrito, string esperado)
+    {
+        var respuesta = await _cliente.PostAsync("/api/practicantes",
+            FormularioPracticante.Crear(nombre: escrito, correo: $"{Guid.NewGuid():N}@correo.com"));
+
+        var registro = await respuesta.Content.ReadFromJsonAsync<RegistroPracticanteResponse>();
+        Assert.Equal(esperado, registro!.NombreCompleto);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("false")]
+    public async Task Registrar_SinAutorizarTratamientoDeDatos_Devuelve400(string? autoriza)
+    {
+        var respuesta = await _cliente.PostAsync("/api/practicantes",
+            FormularioPracticante.Crear(correo: "sin.autorizacion@correo.com", autorizaTratamientoDatos: autoriza));
+
+        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
+        var problema = await respuesta.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        Assert.Contains(problema!.Errors.Keys, k => k.Equals("AutorizaTratamientoDatos", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Registrar_PdfConJavaScript_Devuelve400YNoGuardaElArchivo()
+    {
+        var archivosAntes = ArchivosGuardados();
+        var pdfMalicioso = System.Text.Encoding.ASCII.GetBytes(
+            "%PDF-1.4\n1 0 obj << /Type /Catalog /OpenAction << /S /JavaScript /JS (app.alert(1)) >> >> endobj\n%%EOF");
+
+        var respuesta = await _cliente.PostAsync("/api/practicantes",
+            FormularioPracticante.Crear(correo: "pdf.malicioso@correo.com", archivo: pdfMalicioso));
+
+        Assert.Equal(HttpStatusCode.BadRequest, respuesta.StatusCode);
+        var problema = await respuesta.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+        Assert.Contains("scripts", string.Join(' ', problema!.Errors["HojaDeVida"]));
+        Assert.Empty(ArchivosGuardados().Except(archivosAntes));
+    }
+
     private string[] ArchivosGuardados() => Directory.Exists(_factory.CarpetaHojasDeVida)
         ? Directory.GetFiles(_factory.CarpetaHojasDeVida)
         : [];
@@ -55,6 +97,12 @@ public class RegistroPracticanteTests : IClassFixture<PracticasApiFactory>
     [InlineData("Ana Gómez", "a@b.co", "", "5", "Carrera")]
     [InlineData("Ana Gómez", "a@b.co", "Sistemas", "0", "Semestre")]
     [InlineData("Ana Gómez", "a@b.co", "Sistemas", "13", "Semestre")]
+    [InlineData("Ana Gómez 123", "a@b.co", "Sistemas", "5", "NombreCompleto")]
+    [InlineData("<script>alert(1)</script>", "a@b.co", "Sistemas", "5", "NombreCompleto")]
+    [InlineData("Ana", "a@b.co", "Sistemas", "5", "NombreCompleto")]
+    [InlineData("Annnnna Gómez", "a@b.co", "Sistemas", "5", "NombreCompleto")]
+    [InlineData("Ana Gómez", "ana@correo", "Sistemas", "5", "Correo")]
+    [InlineData("Ana Gómez", "a@b.co", "<b>Sistemas</b>", "5", "Carrera")]
     public async Task Registrar_ConCampoInvalido_Devuelve400ConElCampo(
         string nombre, string correo, string carrera, string semestre, string campoEsperado)
     {

@@ -16,13 +16,15 @@ public static class FormularioPracticante
         string? semestre = "8",
         byte[]? archivo = null,
         string nombreArchivo = "hoja-de-vida.pdf",
-        bool incluirArchivo = true)
+        bool incluirArchivo = true,
+        string? autorizaTratamientoDatos = "true")
     {
         var formulario = new MultipartFormDataContent();
         Agregar(formulario, "nombreCompleto", nombre);
         Agregar(formulario, "correo", correo);
         Agregar(formulario, "carrera", carrera);
         Agregar(formulario, "semestre", semestre);
+        Agregar(formulario, "autorizaTratamientoDatos", autorizaTratamientoDatos);
 
         if (incluirArchivo)
         {

@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Practicas.Api.Auth;
-using Practicas.Api.Contracts;
-using Practicas.Api.Domain;
-using Practicas.Api.Services;
+using Microsoft.AspNetCore.RateLimiting;
+using Practicas.Api.Contratos;
+using Practicas.Application.Autenticacion;
+using Practicas.Application.Practicantes;
+using Practicas.Api.Seguridad;
+using Practicas.Domain;
 
 namespace Practicas.Api.Controllers;
 
@@ -11,21 +13,24 @@ namespace Practicas.Api.Controllers;
 [Route("api/practicantes")]
 [Produces("application/json")]
 [Authorize(Roles = Roles.Analista)]
-public class PracticantesController(IPracticanteService servicio) : ControllerBase
+public sealed class PracticantesController(IPracticanteService servicio) : ControllerBase
 {
     /// <summary>Registra un practicante con su hoja de vida (formulario público).</summary>
     [HttpPost]
     [AllowAnonymous]
+    [EnableRateLimiting(PoliticasLimite.Registro)]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(LimiteSolicitudBytes)]
     [RequestFormLimits(MultipartBodyLengthLimit = LimiteSolicitudBytes)]
     [ProducesResponseType<RegistroPracticanteResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<RegistroPracticanteResponse>> Registrar(
         [FromForm] RegistrarPracticanteRequest solicitud, CancellationToken cancellationToken)
     {
-        var registro = await servicio.RegistrarAsync(solicitud, cancellationToken);
+        ArgumentNullException.ThrowIfNull(solicitud);
+        var registro = await servicio.RegistrarAsync(solicitud.AComando(), cancellationToken);
         return CreatedAtAction(nameof(Obtener), new { id = registro.Id }, registro);
     }
 
@@ -46,18 +51,52 @@ public class PracticantesController(IPracticanteService servicio) : ControllerBa
         return practicante is null ? NoEncontrado(id) : Ok(practicante);
     }
 
-    /// <summary>Marca al practicante como "Viable" o "No viable".</summary>
-    [HttpPatch("{id:int}/estado")]
+    /// <summary>
+    /// Evalúa la hoja de vida con la rúbrica de calidad y marca al practicante como "Viable" o "No viable".
+    /// No se puede decidir sin calificar todos los criterios; "No viable" exige motivos y una decisión
+    /// contraria a la recomendación de la rúbrica exige justificación.
+    /// </summary>
+    [HttpPut("{id:int}/evaluacion")]
     [Consumes("application/json")]
+    [RequestSizeLimit(16 * 1024)]
     [ProducesResponseType<PracticanteResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<PracticanteResponse>> ActualizarEstado(
-        int id, [FromBody] ActualizarEstadoRequest solicitud, CancellationToken cancellationToken)
+    public async Task<ActionResult<PracticanteResponse>> Evaluar(
+        int id, [FromBody] EvaluarPracticanteRequest solicitud, CancellationToken cancellationToken)
     {
-        var practicante = await servicio.ActualizarEstadoAsync(id, solicitud.Estado!.Value, cancellationToken);
+        ArgumentNullException.ThrowIfNull(solicitud);
+        var practicante = await servicio.EvaluarAsync(id, solicitud.AComando(Evaluador), cancellationToken);
         return practicante is null ? NoEncontrado(id) : Ok(practicante);
     }
+
+    /// <summary>
+    /// Guarda el avance de la evaluación mientras el analista califica (criterios, decisión tentativa,
+    /// motivos y comentario). No cambia el estado del practicante; se descarta al guardar la evaluación.
+    /// </summary>
+    [HttpPut("{id:int}/evaluacion/borrador")]
+    [Consumes("application/json")]
+    [RequestSizeLimit(16 * 1024)]
+    [ProducesResponseType<BorradorResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<BorradorResponse>> GuardarBorrador(
+        int id, [FromBody] BorradorEvaluacionRequest solicitud, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(solicitud);
+        var borrador = await servicio.GuardarBorradorAsync(id, solicitud.AComando(Evaluador), cancellationToken);
+        return borrador is null ? NoEncontrado(id) : Ok(borrador);
+    }
+
+    /// <summary>Descarta el avance guardado de la evaluación.</summary>
+    [HttpDelete("{id:int}/evaluacion/borrador")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DescartarBorrador(int id, CancellationToken cancellationToken) =>
+        await servicio.DescartarBorradorAsync(id, cancellationToken) ? NoContent() : NoEncontrado(id);
+
+    /// <summary>Nombre del analista autenticado, tomado del token (nunca del cuerpo de la solicitud).</summary>
+    private string Evaluador => User.Identity?.Name ?? User.FindFirst("sub")?.Value ?? "Analista";
 
     /// <summary>Descarga la hoja de vida (PDF) del practicante.</summary>
     [HttpGet("{id:int}/hoja-de-vida")]

@@ -1,0 +1,22 @@
+<Project>
+  <!-- Configuración común a todos los proyectos del backend. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+
+    <!-- Calidad: analizadores de .NET con el conjunto recomendado y advertencias tratadas como errores. -->
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591: no se exige comentario XML en cada miembro público. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <!-- Seguridad: revisa vulnerabilidades conocidas en dependencias directas y transitivas al restaurar. -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+  </PropertyGroup>
+</Project>
